@@ -1,0 +1,105 @@
+
+
+
+using System.Collections.Immutable;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
+using System.Diagnostics;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Net;
+using System.Numerics;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
+using System.Xml.XPath;
+
+
+internal class Program
+{
+    public const int Blinks = 75;
+
+    private static void Main(string[] args)
+    {
+
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+        var stones = ParseStones(data);
+        var stopWatch = new Stopwatch();
+        stopWatch.Start();
+        for (var blink = 0; blink < Blinks; blink++)
+        {
+            stones = PerformBlink(stones);
+            //Console.WriteLine("Diction Size: " + stones.Keys.Count);
+        }
+        stopWatch.Stop();
+
+        Console.WriteLine("Answer: " + stones.Values.Sum());
+        Console.WriteLine("Elapsed time: " + stopWatch.ElapsedMilliseconds);
+    }
+
+    private static Dictionary<long, long> PerformBlink(Dictionary<long, long> stones)
+    {
+        var newStones = new Dictionary<long, long>();
+        var stoneValues = stones.Keys.ToList();
+        stoneValues.Sort();
+        foreach (var stone in stoneValues)
+        {
+            var stoneString = stone.ToString();
+            if (stone == 0)
+            {
+                newStones.Add(1, stones[stone]);
+            }
+            else if (stoneString.Length % 2 == 0)
+            {
+                var firstStone = long.Parse(stoneString.Substring(0, stoneString.Length / 2));
+                var secondString = stoneString.Substring(stoneString.Length / 2, stoneString.Length / 2).TrimStart('0');
+                var secondStone = long.Parse(string.IsNullOrEmpty(secondString) ? "0" : secondString);
+
+                if (newStones.ContainsKey(firstStone))
+                {
+                    newStones[firstStone] += stones[stone];
+                }
+                else
+                {
+                    newStones[firstStone] = stones[stone];
+                }
+
+                if (newStones.ContainsKey(secondStone))
+                {
+                    newStones[secondStone] += stones[stone];
+                }
+                else
+                {
+                    newStones[secondStone] = stones[stone];
+                }
+            }
+            else
+            {
+
+                var newStone = stone * 2024;
+                newStones.Add(newStone, stones[stone]);
+            }
+        }
+        return newStones;
+    }
+
+    private static Dictionary<long, long> ParseStones(string data)
+    {
+        var result = new Dictionary<long, long>();
+        foreach (var stone in data.Split(" "))
+        {
+            result.Add(Int64.Parse(stone), 1);
+        }
+        return result;
+    }
+}
+

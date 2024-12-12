@@ -1,0 +1,228 @@
+
+
+
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Net;
+using System.Numerics;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
+using System.Xml.XPath;
+
+
+public class Equation
+{
+    public Int64 Key { get; set; }
+    public List<Int64> Value { get; set; } = new List<long>();
+}
+
+internal class Program
+{
+    enum OPERATORS
+    {
+        MULT = 0,
+        DIV = 1,
+        ADD = 2,
+        SUB = 3,
+        CONCAT = 4
+    }
+
+    static List<OPERATORS> operators_list = new List<OPERATORS>([OPERATORS.ADD, OPERATORS.MULT, OPERATORS.CONCAT]);
+
+    private static void Main(string[] args)
+    {
+
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+        Int64 answer = 0;
+        var equations = ParseData(data);
+
+
+        foreach (var equation in equations)
+        {
+            var allOperators = new List<List<OPERATORS>>();
+            GenerateOperators(new List<OPERATORS>(), operators_list, equation.Value.Count - 1, allOperators);
+
+            foreach (var operators in allOperators)
+            {
+                var result = PerformMath(operators, equation.Value);
+                if (result == equation.Key)
+                {
+                    answer += result;
+                    OutputEquation(equation, operators);
+                    break;
+                }
+            }
+        }
+
+        Console.WriteLine("Answer: " + answer);
+    }
+
+    private static void OutputEquation(Equation equation, List<OPERATORS> operators)
+    {
+        var builder = new StringBuilder();
+        builder.Append(equation.Key);
+        builder.Append("=");
+        for (var i = 0; i < equation.Value.Count; i++)
+        {
+            builder.Append(equation.Value[i]);
+            if (i < operators.Count)
+            {
+                builder.Append(operators[i]);
+            }
+        }
+        Console.WriteLine(builder.ToString());
+    }
+
+    static void GenerateOperators(List<OPERATORS> currentCombination, List<OPERATORS> options, Int64 slotsRemaining, List<List<OPERATORS>> result)
+    {
+        if (slotsRemaining == 0)
+        {
+            // Base case: Add the completed combination
+            result.Add(new List<OPERATORS>(currentCombination));
+            return;
+        }
+
+        foreach (var option in options)
+        {
+            // Add the option to the current combination
+            currentCombination.Add(option);
+            // Recur with one less slot
+            GenerateOperators(currentCombination, options, slotsRemaining - 1, result);
+            // Backtrack
+            currentCombination.RemoveAt(currentCombination.Count - 1);
+        }
+    }
+
+    private static Int64 PerformMath(List<OPERATORS> operators, List<Int64> values)
+    {
+        var first = 0;
+        Int64 result = 0;
+        switch (operators[first])
+        {
+            case OPERATORS.MULT:
+                result = values[first] * values[first + 1];
+                break;
+            case OPERATORS.DIV:
+                result = values[first] / values[first + 1];
+                break;
+            case OPERATORS.SUB:
+                result = values[first] - values[first + 1];
+                break;
+            case OPERATORS.ADD:
+                result = values[first] + values[first + 1];
+                break;
+            case OPERATORS.CONCAT:
+                result = long.Parse(values[first].ToString() + values[first + 1].ToString());
+                break;
+        }
+        if (values.Count > 2)
+        {
+            var newList = new List<Int64>();
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (i == first)
+                {
+                    newList.Add(result);
+                }
+                else if (i == first + 1)
+                {
+                    // do nothing
+                }
+                else
+                {
+                    newList.Add(values[i]);
+                }
+            }
+            var newOperators = operators.Where((o, i) => i != first).ToList();
+            return PerformMath(newOperators, newList);
+        }
+        else
+        {
+            return result;
+        }
+    }
+
+
+    // private static Int64 PerformMath(List<OPERATORS> operators, List<Int64> values)
+    // {
+    //     var first = GetFirstOperator(operators);
+    //     var result = 0;
+    //     switch (operators[first])
+    //     {
+    //         case OPERATORS.MULT:
+    //             result = values[first] * values[first + 1];
+    //             break;
+    //         case OPERATORS.DIV:
+    //             result = values[first] / values[first + 1];
+    //             break;
+    //         case OPERATORS.SUB:
+    //             result = values[first] - values[first + 1];
+    //             break;
+    //         case OPERATORS.ADD:
+    //             result = values[first] + values[first + 1];
+    //             break;
+    //     }
+    //     if (values.Count > 2)
+    //     {
+    //         var newList = new List<Int64>();
+    //         for (Int64 i = 0; i < values.Count; i++)
+    //         {
+    //             if (i == first)
+    //             {
+    //                 newList.Add(result);
+    //             }
+    //             else if (i == first + 1)
+    //             {
+    //                 // do nothing
+    //             }
+    //             else
+    //             {
+    //                 newList.Add(values[i]);
+    //             }
+    //         }
+    //         var newOperators = operators.Where((o, i) => i != first).ToList();
+    //         return PerformMath(newOperators, newList);
+    //     }
+    //     else
+    //     {
+    //         return values[0];
+    //     }
+    // }
+
+    // private static Int64 GetFirstOperator(List<OPERATORS> operators)
+    // {
+    //     foreach (var op in operators_list)
+    //     {
+    //         var index = operators.IndexOf(op);
+    //         if (index > 0)
+    //         {
+    //             return index;
+    //         }
+
+    //     }
+    //     return -1;
+    // }
+
+    private static List<Equation> ParseData(string data)
+    {
+        var result = new List<Equation>();
+        foreach (var line in data.Split("\n"))
+        {
+            var parts = line.Trim().Split(":");
+            result.Add(new Equation() { Key = Int64.Parse(parts[0]), Value = [.. parts[1].Trim().Split(" ").ToList().Select(n => Int64.Parse(n))] });
+        }
+        return result;
+    }
+}
+

@@ -1,0 +1,116 @@
+
+
+
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Net;
+using System.Numerics;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
+using System.Xml.XPath;
+
+
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+        var map = BuildMap(data);
+        OutputMap(map);
+        var trailHeads = FindTrailHeads(map);
+        trailHeads.ForEach(p => Console.WriteLine($"{p.X},{p.Y}"));
+        var result = 0;
+
+        foreach (var trail in trailHeads)
+        {
+            var nines = new List<Point>();
+            result += FindPath(trail, map, nines);
+        }
+        Console.WriteLine("result: " + result);
+    }
+
+    private static void OutputMap(int[][] map)
+    {
+        // Output the grid to verify
+        foreach (var row in map)
+        {
+            Console.WriteLine(string.Join("", row));
+        }
+    }
+
+    private static int FindPath(Point currentPoint, int[][] map, List<Point> nines)
+    {
+        var endCount = 0;
+        var currentVal = map[currentPoint.X][currentPoint.Y];
+        if (currentVal == 9)// && !nines.Contains(currentPoint))
+        {
+            nines.Add(currentPoint);
+            return 1;
+        }
+
+        if (currentPoint.X < map.Length - 1 && map[currentPoint.X + 1][currentPoint.Y] - currentVal == 1)
+        {
+            endCount += FindPath(new Point(currentPoint.X + 1, currentPoint.Y), map, nines);
+        }
+
+        if (currentPoint.X > 0 && map[currentPoint.X - 1][currentPoint.Y] - currentVal == 1)
+        {
+            endCount += FindPath(new Point(currentPoint.X - 1, currentPoint.Y), map, nines);
+        }
+
+        if (currentPoint.Y < map[currentPoint.X].Length - 1 && map[currentPoint.X][currentPoint.Y + 1] - currentVal == 1)
+        {
+            endCount += FindPath(new Point(currentPoint.X, currentPoint.Y + 1), map, nines);
+        }
+
+        if (currentPoint.Y > 0 && map[currentPoint.X][currentPoint.Y - 1] - currentVal == 1)
+        {
+            endCount += FindPath(new Point(currentPoint.X, currentPoint.Y - 1), map, nines);
+        }
+        return endCount;
+    }
+
+    private static List<Point> FindTrailHeads(int[][] map)
+    {
+        var results = new List<Point>();
+        for (var x = 0; x < map.Length; x++)
+        {
+            for (var y = 0; y < map[x].Length; y++)
+            {
+                if (map[x][y] == 0)
+                {
+                    results.Add(new Point(x, y));
+                }
+            }
+        }
+        return results;
+    }
+
+
+
+    private static int[][] BuildMap(string data)
+    {
+        string[] lines = data.Trim().Split('\n');
+
+        // Step 2: Convert each line into an array of integers
+        return lines
+            .Select(line => line.Trim().Select(ch => ch - '0').ToArray())
+            .ToArray();
+
+    }
+
+}
+

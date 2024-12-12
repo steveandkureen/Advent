@@ -1,0 +1,174 @@
+
+
+
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Net;
+using System.Numerics;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
+using System.Xml.XPath;
+
+
+
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+        List<List<char>>? map = null;
+        var nodes = ParseData(data, out map);
+        var antiNodes = new Dictionary<Point, int>();
+        OutputAntiNodes(antiNodes, map);
+        var MaxX = map.Count;
+        var MaxY = map[0].Count;
+
+        foreach (var key in nodes.Keys)
+        {
+            for (var ant1Index = 0; ant1Index < nodes[key].Count; ant1Index++)
+            {
+                var ant1 = nodes[key][ant1Index];
+                for (var ant2Index = ant1Index + 1; ant2Index < nodes[key].Count; ant2Index++)
+                {
+                    var ant2 = nodes[key][ant2Index];
+                    if (ant1 == ant2)
+                    {
+                        continue;
+                    }
+                    Point antiNode1 = ant1;
+                    Point antiNode2 = ant2;
+                    var slope = CalculateSlope(ant1, ant2);
+                    while (CheckAntiNode(antiNodes, MaxX, MaxY, antiNode1, map))
+                    {
+                        antiNode1 = CalculateAntiNode(antiNode1, slope, false);
+                    }
+                    while (CheckAntiNode(antiNodes, MaxX, MaxY, antiNode2, map))
+                    {
+                        antiNode2 = CalculateAntiNode(antiNode2, slope, true);
+                    }
+
+
+                }
+            }
+        }
+        OutputAntiNodes(antiNodes, map);
+
+        Console.WriteLine("Answer: " + antiNodes.Values.Count);
+    }
+
+    private static bool CheckAntiNode(Dictionary<Point, int> antiNodes, int MaxX, int MaxY, Point antiNode, List<List<char>> map)
+    {
+        if (antiNode.X >= MaxX || antiNode.Y >= MaxY || antiNode.X < 0 || antiNode.Y < 0)
+            return false;
+
+        if (antiNodes.ContainsKey(antiNode))
+        {
+            antiNodes[antiNode]++;
+        }
+        else
+        {
+            antiNodes.Add(antiNode, 1);
+        }
+        return true;
+    }
+
+    private static void OutputAntiNodes(Dictionary<Point, int> nodes, List<List<char>> map)
+    {
+        using (var writer = new StreamWriter("C:\\Users\\steve\\Documents\\projects\\advent\\output.txt"))
+        {
+            int x = 0, y = 0;
+            foreach (var line in map)
+            {
+                foreach (var c in line)
+                {
+                    if (nodes.ContainsKey(new Point(x, y)))
+                    {
+                        writer.Write('#');
+                        Console.Write('#');
+                    }
+                    else
+                    {
+                        writer.Write(c);
+                        Console.Write(c);
+                    }
+                    x++;
+                }
+                x = 0;
+                y++;
+                writer.Write("\n");
+                Console.Write("\n");
+            }
+        }
+    }
+
+    private static Point CalculateAntiNode(Point ant1, Point slope, bool up)
+    {
+        if (up)
+        {
+            return new Point(ant1.X + slope.X, ant1.Y + slope.Y);
+        }
+        return new Point(ant1.X - slope.X, ant1.Y - slope.Y);
+    }
+
+    private static double CalculateB(Point ant1, Point ant2, double slope)
+    {
+        return ((slope * ant1.X) / ant1.Y);
+    }
+
+    private static double CalculateDistance(Point a, Point b)
+    {
+        return Math.Sqrt(((b.X - a.X) ^ 2) + ((b.Y - a.Y) ^ 2));
+    }
+
+    private static Point CalculateSlope(Point a, Point b)
+    {
+        return new Point(b.X - a.X, b.Y - a.Y);
+    }
+
+    private static Dictionary<char, List<Point>> ParseData(string data, out List<List<char>> map)
+    {
+        var result = new Dictionary<char, List<Point>>();
+        var lineCount = 0;
+        var lines = data.Split("\n");
+        map = new List<List<char>>();
+        foreach (var line in lines)
+        {
+            map.Add(new List<char>());
+        }
+
+        foreach (var line in lines)
+        {
+            var chars = line.Trim().ToCharArray();
+            for (var i = 0; i < chars.Length; i++)
+            {
+                var c = chars[i];
+                map[lineCount].Add(c);
+                if (c == '.')
+                    continue;
+                if (result.ContainsKey(c))
+                {
+                    result[c].Add(new Point(i, lineCount));
+                }
+                else
+                {
+                    result.Add(c, new List<Point>([new Point(i, lineCount)]));
+                }
+            }
+            lineCount++;
+        }
+        return result;
+    }
+}
+

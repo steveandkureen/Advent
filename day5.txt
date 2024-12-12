@@ -1,0 +1,146 @@
+
+
+
+using System.ComponentModel;
+using System.Formats.Asn1;
+using System.Net;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
+using System.Transactions;
+
+internal class Program
+{
+    static List<string> inputs = new List<string>(new string[] { "MAS", "SAM" });
+    private static void Main(string[] args)
+    {
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+
+        var total = 0;
+        var orders = new Dictionary<string, List<string>>();
+        var pages = new List<List<string>>();
+        ParseData(data, orders, pages);
+
+        foreach (var set in pages)
+        {
+            if (!CheckPages(orders, set))
+            {
+                var fixedPages = FixPages(orders, set);
+                total += int.Parse(fixedPages[(fixedPages.Count / 2)]);
+            }
+        }
+
+        Console.WriteLine("Answer: " + total);
+    }
+
+    private static List<string> FixPages(Dictionary<string, List<string>> orders, List<string> pages)
+    {
+        while (!CheckPages(orders, pages))
+        {
+            for (var i = 0; i < pages.Count; i++)
+            {
+                var page = pages[i];
+                if (orders.ContainsKey(page))
+                {
+                    var invalid = orders[page];
+                    for (var x = 0; x < i; x++)
+                    {
+                        var f = invalid.FirstOrDefault(p => p == pages[x]);
+                        if (!string.IsNullOrEmpty(f))
+                        {
+                            var t = pages[i];
+                            pages[i] = f;
+                            pages[x] = t;
+                        }
+                    }
+                }
+            }
+        }
+        return pages;
+    }
+
+    private static bool CheckPages(Dictionary<string, List<string>> orders, List<string> pages)
+    {
+        for (var i = 0; i < pages.Count; i++)
+        {
+            var page = pages[i];
+            if (orders.ContainsKey(page))
+            {
+                var invalid = orders[page];
+                for (var x = 0; x < i; x++)
+                {
+                    if (invalid.Any(p => p == pages[x]))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void ParseData(string data, Dictionary<string, List<string>> orders, List<List<string>> pages)
+    {
+        bool parseInstructions = true;
+        foreach (var line in data.Split("\n"))
+        {
+            var trimmedLine = line.Trim();
+            if (parseInstructions)
+            {
+                if (string.IsNullOrEmpty(trimmedLine))
+                {
+                    parseInstructions = false;
+                    continue;
+                }
+                var parts = trimmedLine.Split("|");
+                if (parts.Length == 2)
+                {
+                    if (orders.ContainsKey(parts[0]))
+                    {
+                        orders[parts[0]].Add(parts[1]);
+                    }
+                    else
+                    {
+                        orders.Add(parts[0], new List<string>() { parts[1] });
+                    }
+                }
+            }
+            else
+            {
+                pages.Add(new List<string>(trimmedLine.Split(",")));
+            }
+        }
+    }
+
+
+}
+
+//var distance = 0;
+
+// array1 = array1.OrderBy(r => r).ToList();
+// array2 = array2.OrderBy(r => r).ToList();
+
+// for (var i = 0; i < array1.Count; i++ )
+// {
+//     Console.WriteLine($"val1: {array1[i]}, val2: {array2[i]} = {Math.Abs(array1[i] - array2[i])}");
+//     distance += Math.Abs(array1[i] - array2[i]);
+// }
+
+// var similarity = 0;
+
+// foreach (var val1 in array1)
+// {
+//     foreach(var val2 in array2 )
+//     {
+//         if (val1 == val2) {
+//             similarity += val1;
+//         }
+//     }
+// }
+
+
+//Console.WriteLine(similarity);

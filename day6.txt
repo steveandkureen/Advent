@@ -1,0 +1,236 @@
+
+
+
+using System.ComponentModel;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Net;
+using System.Numerics;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
+using System.Transactions;
+
+
+public class Guard
+{
+    public const string UP = "^";
+    public const string DOWN = "V";
+    public const string LEFT = "<";
+    public const string RIGHT = ">";
+
+    public Point Position { get; set; }
+    public string Direction { get; set; } = UP;
+
+    public Dictionary<Point, int> Obsticals = new Dictionary<Point, int>();
+
+    public bool OnMap { get; set; } = true;
+
+    public bool Looping { get; set; } = false;
+    public int MoveCount { get; private set; } = 1; // to count the starting position
+
+    public int ObstacleHits { get; set; } = 0;
+    public void MoveCharacter(List<List<string>> map, Point newPos)
+    {
+        if (newPos.X >= map[0].Count || newPos.X < 0)
+        {
+            OnMap = false;
+            return;
+        }
+
+        if (newPos.Y >= map.Count || newPos.Y < 0)
+        {
+            OnMap = false;
+            return;
+        }
+
+
+
+        if (IsBlocked(map[newPos.Y][newPos.X]))
+        {
+            if (Obsticals.ContainsKey(newPos))
+            {
+                Obsticals[newPos]++;
+                if (Obsticals[newPos] > 5)
+                {
+                    Looping = true;
+                    return;
+                }
+            }
+            else
+            {
+                Obsticals.Add(newPos, 1);
+            }
+
+            TurnRight();
+            map[Position.Y][Position.X] = "+";
+            return;
+        }
+        else
+        {
+            if (map[newPos.Y][newPos.X] == ".")
+            {
+                if (Direction == LEFT || Direction == RIGHT)
+                {
+                    map[newPos.Y][newPos.X] = "-";
+                }
+                else
+                {
+                    map[newPos.Y][newPos.X] = "|";
+                }
+            }
+            else
+            {
+                if ((map[newPos.Y][newPos.X] == "-" && (Direction == UP || Direction == DOWN)) ||
+                    (map[newPos.Y][newPos.X] == "|" && (Direction == LEFT || Direction == RIGHT)))
+                {
+                    map[newPos.Y][newPos.X] = "+";
+                }
+            }
+        }
+
+        Position = newPos;
+    }
+
+    private bool CheckLooping(string next)
+    {
+        switch (Direction)
+        {
+            case UP:
+            case DOWN:
+                return next == "|" || next == "+";
+            case LEFT:
+            case RIGHT:
+                return next == "-" || next == "+";
+
+        }
+        return false;
+    }
+
+    private void TurnRight()
+    {
+        switch (Direction)
+        {
+            case UP:
+                Direction = RIGHT;
+                break;
+            case DOWN:
+                Direction = LEFT;
+                break;
+            case LEFT:
+                Direction = UP;
+                break;
+            case RIGHT:
+                Direction = DOWN;
+                break;
+        }
+    }
+
+    private bool IsBlocked(string v)
+    {
+        return v == "#" || v == "O";
+    }
+}
+
+
+internal class Program
+{
+
+    static List<string> characters = new List<string>(new string[] { Guard.UP, Guard.DOWN, Guard.LEFT, Guard.RIGHT });
+    private static void Main(string[] args)
+    {
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+        Console.WriteLine("X Count: " + data.Where(c => c == 'X').ToList().Count);
+        var map = new List<List<string>>();
+        ParseData(data, map);
+        var pos = FindGuard(map);
+        var guard = new Guard() { Position = pos, Direction = map[pos.Y][pos.X] };
+        Console.WriteLine("Start Pos: " + pos.ToString());
+        var obstacleCount = 0;
+        for (var x = 0; x < map[0].Count; x++)
+        {
+            for (var y = 0; y < map.Count; y++)
+            {
+                if (pos.Y == y && pos.X == x)
+                {
+                    continue;
+                }
+
+                map = new List<List<string>>();
+                ParseData(data, map);
+                map[y][x] = "O";
+                guard = new Guard() { Position = pos, Direction = map[pos.Y][pos.X] };
+                map[pos.Y][pos.X] = "X";
+                while (guard.OnMap && !guard.Looping)
+                {
+                    switch (guard.Direction)
+                    {
+                        case Guard.UP:
+                            guard.MoveCharacter(map, new Point(guard.Position.X, guard.Position.Y - 1));
+                            break;
+                        case Guard.DOWN:
+                            guard.MoveCharacter(map, new Point(guard.Position.X, guard.Position.Y + 1));
+                            break;
+                        case Guard.LEFT:
+                            guard.MoveCharacter(map, new Point(guard.Position.X - 1, guard.Position.Y));
+                            break;
+                        case Guard.RIGHT:
+                            guard.MoveCharacter(map, new Point(guard.Position.X + 1, guard.Position.Y));
+                            break;
+                    }
+                }
+                if (guard.Looping)
+                {
+                    //OutputMap(map);
+                    obstacleCount++;
+                }
+            }
+        }
+
+        Console.WriteLine("Answer: " + obstacleCount);
+    }
+
+    private static Point FindGuard(List<List<string>> map)
+    {
+        var result = new Point(0, 0);
+        for (var x = 0; x < map.Count; x++)
+        {
+            for (var y = 0; y < map.Count; y++)
+            {
+                if (characters.Contains(map[y][x]))
+                {
+                    return new Point(x, y);
+                }
+            }
+        }
+        throw new Exception("Chacter Not found");
+    }
+
+    private static void ParseData(string data, List<List<string>> map)
+    {
+        foreach (var line in data.Split("\n"))
+        {
+            var trimmedLine = line.Trim();
+            map.Add(new List<string>(trimmedLine.ToCharArray().Select(c => c.ToString())));
+        }
+    }
+
+    private static void OutputMap(List<List<string>> map)
+    {
+        using (var write = new StreamWriter(File.OpenWrite("C:\\Users\\steve\\Documents\\projects\\advent\\output.txt")))
+        {
+            foreach (var line in map)
+            {
+                write.WriteLine(string.Join("", line));
+            }
+            write.Close();
+        }
+    }
+}
+

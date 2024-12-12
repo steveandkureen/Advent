@@ -1,0 +1,255 @@
+
+
+
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Net;
+using System.Numerics;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
+using System.Xml.XPath;
+
+public class MyFile
+{
+    public int Index { get; set; }
+    public int Size { get; set; }
+    public int FileId { get; set; }
+}
+
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+        var map = BuildMap(data);
+        Console.WriteLine("Map: " + OutputMap(map));
+        map = CompressMap(map);
+        Console.WriteLine("Compressed: " + OutputMap(map));
+        var result = CalculateCheckSum(map);
+        Console.WriteLine("Answer: " + result);
+    }
+
+    private static string OutputMap(List<int> map)
+    {
+        var build = new StringBuilder();
+        foreach (var m in map)
+        {
+            if (m == -1)
+            {
+                build.Append(".");
+            }
+            else
+            {
+                build.Append(m);
+            }
+        }
+        return build.ToString();
+    }
+
+    private static Int64 CalculateCheckSum(List<int> map)
+    {
+        Int64 result = 0;
+        for (var i = 0; i < map.Count; i++)
+        {
+            if (map[i] == -1)
+                continue;
+
+            result += i * int.Parse(map[i].ToString());
+        }
+        return result;
+    }
+
+    private static List<int> CompressMap(List<int> map)
+    {
+        var endIndex = map.Count - 1;
+        while (endIndex >= 0)
+        {
+            var file = GetFileToMove(map, endIndex);
+            if (file != null)
+            {
+                var openIndex = FindFreeSpace(file, map);
+                if (openIndex < map.Count && openIndex < file.Index)
+                {
+                    map = MoveFile(file, map, openIndex);
+                }
+                endIndex = file.Index - 1;
+            }
+            else
+            {
+                return map;
+            }
+        }
+        return map;
+    }
+
+    private static List<int> MoveFile(MyFile file, List<int> map, int openIndex)
+    {
+        var index = openIndex;
+        var id = map[index];
+        var fileIndex = file.Index;
+        while (index < map.Count && index < openIndex + file.Size && fileIndex < map.Count)
+        {
+            map[index] = map[fileIndex];
+            map[fileIndex] = -1;
+            index++;
+            fileIndex++;
+        }
+        return map;
+    }
+
+    private static int FindFreeSpace(MyFile file, List<int> map)
+    {
+        var openIndex = 0;
+        while (openIndex < map.Count && openIndex < file.Index)
+        {
+            var size = 0;
+
+            if (map[openIndex] == -1)
+            {
+                var endIndex = openIndex;
+                while (endIndex < map.Count && map[endIndex] == -1)
+                {
+                    size++;
+                    endIndex++;
+                }
+                if (size >= file.Size)
+                {
+                    return openIndex;
+                }
+                else
+                {
+                    openIndex = endIndex;
+                }
+            }
+            openIndex++;
+        }
+        return openIndex;
+    }
+
+    private static MyFile? GetFileToMove(List<int> map, int endIndex)
+    {
+        while (endIndex >= 0)
+        {
+            var c = map[endIndex];
+            if (map[endIndex] != -1)
+            {
+                var id = map[endIndex];
+                var fileSize = 0;
+                while (endIndex >= 0 && map[endIndex] == id)
+                {
+                    endIndex--;
+                    fileSize++;
+                }
+                return new MyFile { FileId = id, Index = endIndex + 1, Size = fileSize };
+            }
+            endIndex--;
+        }
+        return null;
+    }
+
+    // private static List<int> CompressMap(List<int> map)
+    // {
+    //     var endIndex = map.Count - 1;
+    //     for (int openPos = 0; openPos < map.Count; openPos++)
+    //     {
+    //         if (map[openPos] == -1)
+    //         {
+    //             var size = GetEmptySize(map, openPos);
+    //             var index = GetMapEnd(map, size, endIndex);
+    //             if ((index == -1) || (index <= openPos))
+    //             {
+    //                 return map;
+    //             }
+    //             var id = map[index];
+    //             endIndex = index - 1;
+    //             while (index < map.Count && openPos < map.Count && id == map[index])
+    //             {
+    //                 map[openPos] = map[index];
+    //                 map[index] = -1;
+    //                 index++;
+    //                 openPos++;
+    //             }
+    //             openPos--;
+    //         }
+    //     }
+    //     return map;
+    // }
+
+    private static int GetEmptySize(List<int> map, int i)
+    {
+        int size = 0;
+        while (map[i] == -1)
+        {
+            size++;
+            i++;
+        }
+        return size;
+    }
+
+    private static int GetMapEnd(List<int> map, int size, int index)
+    {
+        while (index >= 0)
+        {
+            if (map[index] != -1)
+            {
+                var id = map[index];
+                var fileSize = 0;
+                while (index >= 0 && map[index] == id)
+                {
+                    index--;
+                    fileSize++;
+                }
+                if (size >= fileSize)
+                {
+                    return index + 1;
+                }
+            }
+            index--;
+        }
+        return -1;
+    }
+
+    private static List<int> BuildMap(string data)
+    {
+        var map = new List<int>();
+        var mapIndex = 0;
+        bool isSize = true;
+        int fileId = 0;
+        foreach (var c in data)
+        {
+            if (isSize)
+            {
+                for (var i = 0; i < int.Parse(c.ToString()); i++)
+                {
+                    map.Add(fileId);
+                }
+                isSize = false;
+            }
+            else
+            {
+                for (var i = 0; i < int.Parse(c.ToString()); i++)
+                {
+                    map.Add(-1);
+                }
+                fileId++;
+                isSize = true;
+            }
+            mapIndex++;
+        }
+        return map;
+    }
+
+}
+
