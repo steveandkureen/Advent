@@ -8,9 +8,11 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Formats.Asn1;
+using System.IO.Compression;
 using System.Net;
 using System.Numerics;
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization.Formatters;
 using System.Security.Cryptography.X509Certificates;
@@ -23,33 +25,30 @@ using System.Xml.XPath;
 
 internal class Program
 {
-    public const int Blinks = 75;
-
-    public class Plot
+    public class Machine
     {
-        public string Plant { get; set; } = string.Empty;
-        public int Count { get; set; } = 1;
-        public List<Point> Plots { get; set; } = new List<Point>();
-
-        public void BuildMap(List<List<string>> map)
-        {
-
-        }
-
-        internal bool IsAjacent(Point pos)
-        {
-            if (Plots.Contains(new Point(pos.X - 1, pos.Y)) || Plots.Contains(new Point(pos.X, pos.Y - 1)))
-            {
-                return true;
-            }
-            return false;
-        }
-
-        internal void CalculateParimeter()
-        {
-            Plots.OrderBy(a => a.Y).ThenBy(a => a.X).ToList();
-        }
+        public LongPoint A { get; set; } = new LongPoint();
+        public LongPoint B { get; set; } = new LongPoint();
+        public LongPoint Prize { get; set; } = new LongPoint();
     }
+
+    public class LongPoint
+    {
+        public LongPoint()
+        {
+
+        }
+        public LongPoint(long x, long y)
+        {
+            X = x;
+            Y = y;
+        }
+        public long X { get; private set; }
+        public long Y { get; private set; }
+    }
+
+    const long Max_Press = 100;
+
     private static void Main(string[] args)
     {
 
@@ -58,138 +57,70 @@ internal class Program
         {
             data = reader.ReadToEnd();
         }
-        var map = ParseMap(data);
+        var machines = ParseMap(data);
 
-        var plots = new Dictionary<string, List<Plot>>();
-
-        for (var y = 0; y < map.Count; y++)
+        long totalCost = 0;
+        foreach (var machine in machines)
         {
-            for (var x = 0; x < map[y].Count; x++)
+            var attempt = new List<long>();
+            for (long a = 0; a < Max_Press; a++)
             {
-                var pos = new Point(x, y);
-                GetPlot(pos, plots, map);
-            }
-        }
-
-        CalculateParimeter(plots);
-
-        CheckPlots(plots, map);
-
-        Console.WriteLine("Answer: " + OutputPlots(plots));
-    }
-
-    private static void CalculateParimeter(Dictionary<string, List<Plot>> plots)
-    {
-        foreach (var plant in plots.Keys)
-        {
-            foreach (var plot in plots[plant])
-            {
-                plot.CalculateParimeter();
-            }
-        }
-    }
-
-    private static void CheckPlots(Dictionary<string, List<Plot>> plots, List<List<string>> map)
-    {
-        foreach (var plant in plots.Keys)
-        {
-            foreach (var plot in plots[plant])
-            {
-                foreach (var p in plot.Plots)
+                for (long b = 0; b < Max_Press; b++)
                 {
-                    if (map[p.Y][p.X] != plant)
+                    var x = a * machine.A.X;
+                    var y = a * machine.A.Y;
+                    if (a == 90 && b == 40)
+                        a = 90;
+                    x += b * machine.B.X;
+                    y += b * machine.B.Y;
+                    if (x == machine.Prize.X && y == machine.Prize.Y)
                     {
-                        Console.WriteLine($"{plant}!={map[p.Y][p.X]},pos: {p.Y},{p.X}");
-                    }
-                }
-                if (plot.Plots.Distinct().Count() != plot.Plots.Count)
-                {
-                    Console.WriteLine($"{plant} has duplicate");
-                    foreach (var p in plot.Plots)
-                    {
-                        Console.WriteLine($"{plant} pos: {p.Y},{p.X}");
+                        attempt.Add((a * 3) + b);
                     }
                 }
             }
+            if (attempt.Count > 0)
+            {
+                totalCost += attempt.Min();
+            }
         }
+        Console.WriteLine("Answer: " + totalCost);
     }
 
-    private static string OutputPlots(Dictionary<string, List<Plot>> plots)
+
+    private static List<Machine> ParseMap(string data)
     {
-        var build = new StringBuilder();
-        foreach (var plants in plots.Keys)
+        var machines = new List<Machine>();
+        var lines = data.Split("\n");
+        for (var i = 0; i < lines.Length; i++)
         {
-            build.Append($"{plants}: ");
-            foreach (var plot in plots[plants])
-            {
-                build.Append($"{plot.Plots.Count}, ");
-            }
-            build.Append("\n");
+            var buttonA = lines[i++];
+            var buttonB = lines[i++];
+            var prize = lines[i++];
+            var machine = new Machine();
+
+            machine.A = ParseButton(buttonA.Trim());
+            machine.B = ParseButton(buttonB.Trim());
+            machine.Prize = ParsePrize(prize);
+            machines.Add(machine);
         }
-        return build.ToString();
+        return machines;
     }
 
-    private static Plot GetPlot(Point pos, Dictionary<string, List<Plot>> plots, List<List<string>> map)
+    private static LongPoint ParsePrize(string prize)
     {
-        var plant = map[pos.Y][pos.X];
-        Plot? plot = null;
-        if (plots.ContainsKey(plant))
-        {
-            foreach (var p in plots[plant])
-            {
-                if (p.IsAjacent(pos))
-                {
-                    plot = p;
-                    p.Plots.Add(pos);
-                    break;
-                }
-            }
-
-            if (plot == null)
-            {
-                plot = new Plot() { Plant = plant };
-                plot.Plots.Add(pos);
-                plots[plant].Add(plot);
-                return plot;
-            }
-
-            foreach (var p in plots[plant])
-            {
-                if (p == plot)
-                    continue;
-
-                if (p.Plots.Any(pl => plot.IsAjacent(pl)))
-                {
-                    p.Plots.ForEach(pl => plot.Plots.Add(pl));
-                    plots[plant].Remove(p);
-                    return plot;
-                }
-            }
-
-            return plot;
-        }
-
-        plot = new Plot() { Plant = plant };
-        plots.Add(plant, new List<Plot>([plot]));
-        plot.Plots.Add(pos);
-
-        return plot;
+        var x = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.IndexOf(',') - prize.IndexOf('=') - 1));// + 10000000000000;
+        prize = prize.Substring(prize.IndexOf(',') + 1, prize.Length - prize.IndexOf(',') - 1);
+        var y = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.Length - prize.IndexOf('=') - 1));// + 10000000000000;
+        return new LongPoint(x, y);
     }
 
-    private static List<List<string>> ParseMap(string data)
+    private static LongPoint ParseButton(string button)
     {
-        var map = new List<List<string>>();
-        var y = 0;
-        foreach (var line in data.Split("\n"))
-        {
-            map.Add(new List<string>());
-            foreach (var c in line.Trim().ToCharArray())
-            {
-                map[y].Add(c.ToString());
-            }
-            y++;
-        }
-        return map;
+        var x = int.Parse(button.Substring(button.IndexOf('+') + 1, button.IndexOf(',') - button.IndexOf('+') - 1));
+        button = button.Substring(button.IndexOf(',') + 1, button.Length - button.IndexOf(',') - 1);
+        var y = int.Parse(button.Substring(button.IndexOf('+') + 1, button.Length - button.IndexOf('+') - 1));
+        return new LongPoint(x, y);
     }
 }
 

@@ -12,3 +12,4 @@ C:\Users\steve\Documents\projects\advent\obj\Debug\net8.0\refint\advent.dll
 C:\Users\steve\Documents\projects\advent\obj\Debug\net8.0\advent.pdb
 C:\Users\steve\Documents\projects\advent\obj\Debug\net8.0\advent.genruntimeconfig.cache
 C:\Users\steve\Documents\projects\advent\obj\Debug\net8.0\ref\advent.dll
+c:\Users\steve\Documents\projects\advent\obj\Debug\net8.0\advent.sourcelink.json

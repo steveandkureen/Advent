@@ -1,0 +1,392 @@
+
+
+
+using System.Collections.Immutable;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
+using System.Diagnostics;
+using System.Drawing;
+using System.Formats.Asn1;
+using System.Net;
+using System.Numerics;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Transactions;
+using System.Xml;
+using System.Xml.XPath;
+
+
+internal class Program
+{
+    public const int Blinks = 75;
+
+    public class Plant
+    {
+        public Point Pos { get; set; }
+        public string PlantType { get; set; }
+        public int FenceCount { get; set; }
+        public int SideCount { get; set; }
+
+    }
+
+    public class Plot
+    {
+        public string Plant { get; set; } = string.Empty;
+        public int Count { get; set; } = 1;
+        public List<Plant> Plots { get; set; } = new List<Plant>();
+
+        public void BuildMap(List<List<string>> map)
+        {
+
+        }
+
+        internal bool IsAjacent(Point pos)
+        {
+            if (Plots.Exists(p => p.Pos == new Point(pos.X - 1, pos.Y)) || Plots.Exists(p => p.Pos == new Point(pos.X, pos.Y - 1)))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        internal int GetFenceCount(Point pos, string plant, List<List<string>> map)
+        {
+            int fenceCount = 0;
+            if (pos.X == 0 || map[pos.Y][pos.X - 1] != plant)
+            {
+                fenceCount++;
+            }
+
+            if (pos.Y == 0 || map[pos.Y - 1][pos.X] != plant)
+            {
+                fenceCount++;
+            }
+
+            if (pos.Y == map.Count - 1 || map[pos.Y + 1][pos.X] != plant)
+            {
+                fenceCount++;
+            }
+
+            if (pos.X == map[0].Count - 1 || map[pos.Y][pos.X + 1] != plant)
+            {
+                fenceCount++;
+            }
+            return fenceCount;
+        }
+
+        internal int GetSideCount(Point pos, string plant, List<List<string>> map)
+        {
+            if (plant == "R")
+            {
+                plant = "R";
+            }
+
+            // Abort recusion
+            if (pos.X < 0 || pos.Y < 0 || map[pos.Y][pos.X] != plant)
+                return 0;
+
+            int sideCount = 0;
+            // LEFT SIDE
+            sideCount += GetLeftSide(pos, plant, map);
+
+            // TOP SIDE
+            sideCount += GetTopSide(pos, plant, map);
+
+            // BOTTOM SIDE
+            sideCount += GetBottomSide(pos, plant, map);
+
+            // RIGHT SIDE
+            sideCount += GetRightSide(pos, plant, map);
+
+            return sideCount;
+        }
+
+        internal int GetTopSide(Point pos, string plant, List<List<string>> map, int depth = 0)
+        {
+            // Abort recusion
+            if (pos.X < 0 || pos.Y < 0 || map[pos.Y][pos.X] != plant)
+                return 0;
+
+            if ((pos.Y == 0 || map[pos.Y - 1][pos.X] != plant))
+            {
+                var previous = GetTopSide(new Point(pos.X - 1, pos.Y), plant, map, depth + 1);
+                if (previous == 0)
+                {
+                    return 1;
+                }
+                else if (depth != 0)
+                {
+                    return previous;
+                }
+                else if (depth == 0 && previous == 0)
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+
+            }
+            return 0;
+        }
+
+        internal int GetBottomSide(Point pos, string plant, List<List<string>> map, int depth = 0)
+        {
+            // Abort recusion
+            if (pos.X < 0 || pos.Y < 0 || map[pos.Y][pos.X] != plant)
+                return 0;
+
+            if (pos.Y == map.Count - 1 || map[pos.Y + 1][pos.X] != plant)
+            {
+                var previous = GetBottomSide(new Point(pos.X - 1, pos.Y), plant, map, depth + 1);
+                if (previous == 0)
+                {
+                    return 1;
+                }
+                else if (depth != 0)
+                {
+                    return previous;
+                }
+                else if (depth == 0 && previous == 0)
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+
+            }
+            return 0;
+        }
+
+        internal int GetLeftSide(Point pos, string plant, List<List<string>> map, int depth = 0)
+        {
+            // Abort recusion
+            if (pos.X < 0 || pos.Y < 0 || map[pos.Y][pos.X] != plant)
+                return 0;
+
+            if (pos.X == 0 || map[pos.Y][pos.X - 1] != plant)
+            {
+                var previous = GetLeftSide(new Point(pos.X, pos.Y - 1), plant, map, depth + 1);
+                if (previous == 0)
+                {
+                    return 1;
+                }
+                else if (depth != 0)
+                {
+                    return previous;
+                }
+                else if (depth == 0 && previous == 0)
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+
+            }
+            return 0;
+        }
+        internal int GetRightSide(Point pos, string plant, List<List<string>> map, int depth = 0)
+        {
+            // Abort recusion
+            if (pos.X < 0 || pos.Y < 0 || map[pos.Y][pos.X] != plant)
+                return 0;
+
+
+            if (pos.X == map[0].Count - 1 || map[pos.Y][pos.X + 1] != plant)
+            {
+                var previous = GetRightSide(new Point(pos.X, pos.Y - 1), plant, map, depth + 1);
+                if (previous == 0)
+                {
+                    return 1;
+                }
+                else if (depth != 0)
+                {
+                    return previous;
+                }
+                else if (depth == 0 && previous == 0)
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+
+            }
+            return 0;
+        }
+
+    }
+    private static void Main(string[] args)
+    {
+
+        string data = "";
+        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\final.txt"))
+        {
+            data = reader.ReadToEnd();
+        }
+        var map = ParseMap(data);
+
+        var plots = new Dictionary<string, List<Plot>>();
+
+        for (var y = 0; y < map.Count; y++)
+        {
+            for (var x = 0; x < map[y].Count; x++)
+            {
+                var pos = new Point(x, y);
+                GetPlot(pos, plots, map);
+            }
+        }
+
+        CheckPlots(plots, map);
+
+        Console.WriteLine("Answer: " + OutputPlots(plots));
+        Console.WriteLine("Total: " + CalculateAnswer(plots));
+        Console.WriteLine("Total: " + CalculateSidesAnswer(plots));
+    }
+
+
+
+    private static void CheckPlots(Dictionary<string, List<Plot>> plots, List<List<string>> map)
+    {
+        foreach (var plant in plots.Keys)
+        {
+            foreach (var plot in plots[plant])
+            {
+                foreach (var p in plot.Plots)
+                {
+                    if (map[p.Pos.Y][p.Pos.X] != plant)
+                    {
+                        Console.WriteLine($"{plant}!={map[p.Pos.Y][p.Pos.X]},pos: {p.Pos.Y},{p.Pos.X}");
+                    }
+                }
+                if (plot.Plots.Distinct().Count() != plot.Plots.Count)
+                {
+                    Console.WriteLine($"{plant} has duplicate");
+                    foreach (var p in plot.Plots)
+                    {
+                        Console.WriteLine($"{plant} pos: {p.Pos.Y},{p.Pos.X}");
+                    }
+                }
+            }
+        }
+    }
+
+    private static string OutputPlots(Dictionary<string, List<Plot>> plots)
+    {
+        var build = new StringBuilder();
+        foreach (var plants in plots.Keys)
+        {
+            build.Append($"{plants}: ");
+            foreach (var plot in plots[plants])
+            {
+                build.Append($"{plot.Plots.Count}:{plot.Plots.Sum(p => p.SideCount)} = {plot.Plots.Count * plot.Plots.Sum(p => p.SideCount)}, ");
+            }
+            build.Append("\n");
+        }
+        return build.ToString();
+    }
+
+    private static int CalculateAnswer(Dictionary<string, List<Plot>> plots)
+    {
+        var answser = 0;
+        foreach (var plants in plots.Keys)
+        {
+            foreach (var plot in plots[plants])
+            {
+                answser += plot.Plots.Count * plot.Plots.Sum(p => p.FenceCount);
+            }
+        }
+        return answser;
+    }
+    private static int CalculateSidesAnswer(Dictionary<string, List<Plot>> plots)
+    {
+        var answser = 0;
+        foreach (var plants in plots.Keys)
+        {
+            foreach (var plot in plots[plants])
+            {
+                answser += plot.Plots.Count * plot.Plots.Sum(p => p.SideCount);
+            }
+        }
+        return answser;
+    }
+
+    private static Plot GetPlot(Point pos, Dictionary<string, List<Plot>> plots, List<List<string>> map)
+    {
+        var plant = map[pos.Y][pos.X];
+        if (plant == "C")
+        {
+            plant = "C";
+        }
+        Plot? plot = null;
+        if (plots.ContainsKey(plant))
+        {
+            foreach (var p in plots[plant])
+            {
+                if (p.IsAjacent(pos))
+                {
+                    plot = p;
+                    p.Plots.Add(new Plant { Pos = pos, PlantType = plant, FenceCount = p.GetFenceCount(pos, plant, map), SideCount = p.GetSideCount(pos, plant, map) });
+                    break;
+                }
+            }
+
+            if (plot == null)
+            {
+                plot = new Plot() { Plant = plant };
+                plot.Plots.Add(new Plant { Pos = pos, PlantType = plant, FenceCount = plot.GetFenceCount(pos, plant, map), SideCount = plot.GetSideCount(pos, plant, map) });
+                plots[plant].Add(plot);
+                return plot;
+            }
+
+            foreach (var p in plots[plant])
+            {
+                if (p == plot)
+                    continue;
+
+                if (plot.Plots.Any(pl => p.IsAjacent(pl.Pos)))
+                {
+                    p.Plots.ForEach(pl => plot.Plots.Add(pl));
+                    plots[plant].Remove(p);
+                    return plot;
+                }
+            }
+
+            return plot;
+        }
+
+        plot = new Plot() { Plant = plant };
+        plots.Add(plant, new List<Plot>([plot]));
+        plot.Plots.Add(new Plant { Pos = pos, PlantType = plant, FenceCount = plot.GetFenceCount(pos, plant, map), SideCount = plot.GetSideCount(pos, plant, map) });
+
+        return plot;
+    }
+
+    private static List<List<string>> ParseMap(string data)
+    {
+        var map = new List<List<string>>();
+        var y = 0;
+        foreach (var line in data.Split("\n"))
+        {
+            map.Add(new List<string>());
+            foreach (var c in line.Trim().ToCharArray())
+            {
+                map[y].Add(c.ToString());
+            }
+            y++;
+        }
+        return map;
+    }
+}
+
