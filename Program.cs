@@ -27,39 +27,54 @@ internal class Program
 {
     public class Machine
     {
-        public LongPoint A { get; set; } = new LongPoint();
-        public LongPoint B { get; set; } = new LongPoint();
-        public LongPoint Prize { get; set; } = new LongPoint();
+        public DoublePoint A { get; set; } = new DoublePoint();
+        public DoublePoint B { get; set; } = new DoublePoint();
+        public DoublePoint Prize { get; set; } = new DoublePoint();
     }
 
-    public class LongPoint
+    public class DoublePoint
     {
-        public LongPoint()
+        public DoublePoint()
         {
 
         }
-        public LongPoint(long x, long y)
+
+        public DoublePoint(double x, double y)
         {
             X = x;
             Y = y;
         }
-        public long X { get; private set; }
-        public long Y { get; private set; }
+
+        public double X { get; set; }
+        public double Y { get; set; }
+
+        public bool IsEqual(DoublePoint b)
+        {
+            return (X == b.X && Y == b.Y);
+        }
     }
+
 
     const long Max_Press = 100;
 
     private static void Main(string[] args)
     {
+        var file = "C:\\Users\\steve\\Documents\\projects\\advent\\final.txt";
+        //SolveWithBruteForce(file);
+        SolveWithMath(file);
+    }
 
+    private static void SolveWithBruteForce(string file)
+    {
         string data = "";
-        using (var reader = new StreamReader("C:\\Users\\steve\\Documents\\projects\\advent\\input.txt"))
+        using (var reader = new StreamReader(file))
         {
             data = reader.ReadToEnd();
         }
         var machines = ParseMap(data);
 
         long totalCost = 0;
+        var machineCount = 0;
         foreach (var machine in machines)
         {
             var attempt = new List<long>();
@@ -69,13 +84,13 @@ internal class Program
                 {
                     var x = a * machine.A.X;
                     var y = a * machine.A.Y;
-                    if (a == 90 && b == 40)
-                        a = 90;
+
                     x += b * machine.B.X;
                     y += b * machine.B.Y;
                     if (x == machine.Prize.X && y == machine.Prize.Y)
                     {
                         attempt.Add((a * 3) + b);
+                        Console.WriteLine($"Machine{machineCount}=a:{a},b:{b}={machine.Prize.X},{machine.Prize.Y}={a * machine.A.X + b * machine.B.X}, {a * machine.A.Y + a * machine.B.Y}");
                     }
                 }
             }
@@ -83,10 +98,69 @@ internal class Program
             {
                 totalCost += attempt.Min();
             }
+            machineCount++;
         }
         Console.WriteLine("Answer: " + totalCost);
     }
 
+    private static void SolveWithMath(string file)
+    {
+        string data = "";
+        using (var reader = new StreamReader(file))
+        {
+            data = reader.ReadToEnd();
+        }
+        var machines = ParseMap(data);
+
+        double totalCost = 0;
+        long machineCount = 0;
+        foreach (var machine in machines)
+        {
+            var detM = Determinant(machine.A.X, machine.B.X, machine.A.Y, machine.B.Y);
+            if (detM == 0)
+            {
+                continue;
+            }
+
+            var detA = Determinant(machine.Prize.X, machine.B.X, machine.Prize.Y, machine.B.Y);
+            var detB = Determinant(machine.A.X, machine.Prize.X, machine.A.Y, machine.Prize.Y);
+
+            double a = detA / detM;
+            double b = detB / detM;
+
+            if (CalculateMatch(double.Round(a), double.Round(b), machine, machineCount))
+            {
+                totalCost += (a * 3) + b;
+            }
+
+            machineCount++;
+        }
+        Console.WriteLine("Answer: " + totalCost);
+    }
+
+    private static void OutputMachine(long machineCount, Machine machine, double a, double b)
+    {
+        Console.WriteLine($"Machine{machineCount}=a:{a},b:{b}={machine.Prize.X},{machine.Prize.Y}={a * machine.A.X + b * machine.B.X}, {a * machine.A.Y + a * machine.B.Y}");
+    }
+
+    private static bool CalculateMatch(double a, double b, Machine machine, long machineCount)
+    {
+        double x = a * machine.A.X + b * machine.B.X;
+        double y = a * machine.A.Y + b * machine.B.Y;
+        var newVector = new DoublePoint(x, y);
+        if (newVector.IsEqual(machine.Prize))
+        {
+            OutputMachine(machineCount, machine, double.Round(a), double.Round(b));
+            return true;
+        }
+        else
+            return false;
+    }
+
+    private static double Determinant(double a, double b, double c, double d)
+    {
+        return a * d - b * c;
+    }
 
     private static List<Machine> ParseMap(string data)
     {
@@ -107,20 +181,20 @@ internal class Program
         return machines;
     }
 
-    private static LongPoint ParsePrize(string prize)
-    {
-        var x = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.IndexOf(',') - prize.IndexOf('=') - 1));// + 10000000000000;
+    private static DoublePoint ParsePrize(string prize)
+    {                                                                                                            //3345000000 
+        var x = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.IndexOf(',') - prize.IndexOf('=') - 1)) + 10000000000000;
         prize = prize.Substring(prize.IndexOf(',') + 1, prize.Length - prize.IndexOf(',') - 1);
-        var y = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.Length - prize.IndexOf('=') - 1));// + 10000000000000;
-        return new LongPoint(x, y);
+        var y = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.Length - prize.IndexOf('=') - 1)) + 10000000000000;
+        return new DoublePoint(x, y);
     }
 
-    private static LongPoint ParseButton(string button)
+    private static DoublePoint ParseButton(string button)
     {
         var x = int.Parse(button.Substring(button.IndexOf('+') + 1, button.IndexOf(',') - button.IndexOf('+') - 1));
         button = button.Substring(button.IndexOf(',') + 1, button.Length - button.IndexOf(',') - 1);
         var y = int.Parse(button.Substring(button.IndexOf('+') + 1, button.Length - button.IndexOf('+') - 1));
-        return new LongPoint(x, y);
+        return new DoublePoint(x, y);
     }
 }
 
