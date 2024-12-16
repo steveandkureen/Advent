@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Diagnostics;
@@ -25,176 +26,167 @@ using System.Xml.XPath;
 
 internal class Program
 {
-    public class Machine
+    public class Robot
     {
-        public DoublePoint A { get; set; } = new DoublePoint();
-        public DoublePoint B { get; set; } = new DoublePoint();
-        public DoublePoint Prize { get; set; } = new DoublePoint();
+        public Vector2 Pos { get; set; }
+        public Vector2 Vel { get; set; }
     }
 
-    public class DoublePoint
-    {
-        public DoublePoint()
-        {
+    const int Map_Width = 101;
+    const int Map_Height = 103;
+    const int Move_Seconds = 100000;
 
-        }
-
-        public DoublePoint(double x, double y)
-        {
-            X = x;
-            Y = y;
-        }
-
-        public double X { get; set; }
-        public double Y { get; set; }
-
-        public bool IsEqual(DoublePoint b)
-        {
-            return (X == b.X && Y == b.Y);
-        }
-    }
-
-
-    const long Max_Press = 100;
+    static List<string> Maps = new List<string>();
 
     private static void Main(string[] args)
     {
         var file = "C:\\Users\\steve\\Documents\\projects\\advent\\final.txt";
-        //SolveWithBruteForce(file);
-        SolveWithMath(file);
-    }
-
-    private static void SolveWithBruteForce(string file)
-    {
         string data = "";
         using (var reader = new StreamReader(file))
         {
             data = reader.ReadToEnd();
         }
-        var machines = ParseMap(data);
+        var robots = ParseRobots(data);
+        OutputMap(robots);
+        MoveRobots(robots);
+        Console.WriteLine("-------------Complete--------------");
+        OutputMap(robots);
+        CalculteAnswer(robots);
+    }
 
-        long totalCost = 0;
-        var machineCount = 0;
-        foreach (var machine in machines)
+    private static void CalculteAnswer(List<Robot> robots)
+    {
+        var quads = new int[4];
+        foreach (var robot in robots)
         {
-            var attempt = new List<long>();
-            for (long a = 0; a < Max_Press; a++)
+            if (robot.Pos.X < Map_Width / 2 && robot.Pos.Y < Map_Height / 2)
             {
-                for (long b = 0; b < Max_Press; b++)
-                {
-                    var x = a * machine.A.X;
-                    var y = a * machine.A.Y;
+                quads[0]++;
+            }
+            else if (robot.Pos.X > Map_Width / 2 && robot.Pos.Y < Map_Height / 2)
+            {
+                quads[1]++;
+            }
+            else if (robot.Pos.X < Map_Width / 2 && robot.Pos.Y > Map_Height / 2)
+            {
+                quads[2]++;
+            }
+            else if (robot.Pos.X > Map_Width / 2 && robot.Pos.Y > Map_Height / 2)
+            {
+                quads[3]++;
+            }
+        }
+        Console.WriteLine($"Answer={quads[0] * quads[1] * quads[2] * quads[3]}");
+    }
 
-                    x += b * machine.B.X;
-                    y += b * machine.B.Y;
-                    if (x == machine.Prize.X && y == machine.Prize.Y)
-                    {
-                        attempt.Add((a * 3) + b);
-                        Console.WriteLine($"Machine{machineCount}=a:{a},b:{b}={machine.Prize.X},{machine.Prize.Y}={a * machine.A.X + b * machine.B.X}, {a * machine.A.Y + a * machine.B.Y}");
-                    }
+    private static void MoveRobots(List<Robot> robots)
+    {
+        for (var s = 0; s < Move_Seconds; s++)
+        {
+            for (int i = 0; i < robots.Count; i++)
+            {
+                var robot = robots[i];
+                var newPos = new Vector2(robot.Pos.X + robot.Vel.X, robot.Pos.Y + robot.Vel.Y);
+                newPos.X = CheckBoundry(newPos.X, Map_Width);
+                newPos.Y = CheckBoundry(newPos.Y, Map_Height);
+                robot.Pos = newPos;
+            }
+            if (CheckForTree(robots.OrderBy(r => r.Pos.X).ThenBy(r => r.Pos.Y).ToList()))
+            {
+                OutputMap(robots);
+                Console.WriteLine($"---seconds:{s}----");
+                return;
+            }
+            if (s % 1000 == 0)
+            {
+                Console.WriteLine($"---seconds:{s}----");
+            }
+
+        }
+    }
+
+    private static bool CheckForTree(List<Robot> robots)
+    {
+        for (int i = 0; i < robots.Count; i++)
+        {
+            var robot = robots[i];
+            if (IsTree(robot, robots, 0))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsTree(Robot robot, List<Robot> robots, int depth)
+    {
+        var r1 = robots.Where(r => r.Pos.X == robot.Pos.X - depth && r.Pos.Y == robot.Pos.Y + depth);
+        var r2 = robots.Where(r => r.Pos.X == robot.Pos.X + depth && r.Pos.Y == robot.Pos.Y + depth);
+        if (r1.Count() > 0 && r1.Count() > 0)
+        {
+            if (depth > 5)
+            {
+                return true;
+            }
+            else
+            {
+                return IsTree(robot, robots, depth + 1);
+            }
+        }
+        return false;
+    }
+
+    private static float CheckBoundry(float p, int max)
+    {
+        if (p >= max)
+        {
+            p -= max;
+        }
+        else if (p < 0)
+        {
+            p += max;
+        }
+        return p;
+    }
+
+    private static void OutputMap(List<Robot> robots)
+    {
+        var builder = new StringBuilder();
+        for (var y = 0; y < Map_Height; y++)
+        {
+            for (var x = 0; x < Map_Width; x++)
+            {
+                var r = robots.Where(r => r.Pos == new Vector2(x, y));
+                if (r.Count() == 0)
+                {
+                    builder.Append(".");
+                    //Console.Write(".");
+                }
+                else
+                {
+                    builder.Append(r.Count());
+                    //Console.Write(r.Count());
                 }
             }
-            if (attempt.Count > 0)
-            {
-                totalCost += attempt.Min();
-            }
-            machineCount++;
+            builder.Append("\n");
+            //Console.Write("\n");
         }
-        Console.WriteLine("Answer: " + totalCost);
+        Console.Write(builder.ToString());
+        //Maps.Add(builder.ToString());
     }
 
-    private static void SolveWithMath(string file)
+    private static List<Robot> ParseRobots(string data)
     {
-        string data = "";
-        using (var reader = new StreamReader(file))
+        var robots = new List<Robot>();
+        foreach (var line in data.Split("\n"))
         {
-            data = reader.ReadToEnd();
+            var robot = new Robot();
+            var parts = line.Trim().Split(" ");
+            var pos = parts[0].Replace("p=", "").Split(",");
+            robot.Pos = new Vector2(float.Parse(pos[0]), float.Parse(pos[1]));
+            var vel = parts[1].Replace("v=", "").Split(",");
+            robot.Vel = new Vector2(float.Parse(vel[0]), float.Parse(vel[1]));
+            robots.Add(robot);
         }
-        var machines = ParseMap(data);
-
-        double totalCost = 0;
-        long machineCount = 0;
-        foreach (var machine in machines)
-        {
-            var detM = Determinant(machine.A.X, machine.B.X, machine.A.Y, machine.B.Y);
-            if (detM == 0)
-            {
-                continue;
-            }
-
-            var detA = Determinant(machine.Prize.X, machine.B.X, machine.Prize.Y, machine.B.Y);
-            var detB = Determinant(machine.A.X, machine.Prize.X, machine.A.Y, machine.Prize.Y);
-
-            double a = detA / detM;
-            double b = detB / detM;
-
-            if (CalculateMatch(double.Round(a), double.Round(b), machine, machineCount))
-            {
-                totalCost += (a * 3) + b;
-            }
-
-            machineCount++;
-        }
-        Console.WriteLine("Answer: " + totalCost);
-    }
-
-    private static void OutputMachine(long machineCount, Machine machine, double a, double b)
-    {
-        Console.WriteLine($"Machine{machineCount}=a:{a},b:{b}={machine.Prize.X},{machine.Prize.Y}={a * machine.A.X + b * machine.B.X}, {a * machine.A.Y + a * machine.B.Y}");
-    }
-
-    private static bool CalculateMatch(double a, double b, Machine machine, long machineCount)
-    {
-        double x = a * machine.A.X + b * machine.B.X;
-        double y = a * machine.A.Y + b * machine.B.Y;
-        var newVector = new DoublePoint(x, y);
-        if (newVector.IsEqual(machine.Prize))
-        {
-            OutputMachine(machineCount, machine, double.Round(a), double.Round(b));
-            return true;
-        }
-        else
-            return false;
-    }
-
-    private static double Determinant(double a, double b, double c, double d)
-    {
-        return a * d - b * c;
-    }
-
-    private static List<Machine> ParseMap(string data)
-    {
-        var machines = new List<Machine>();
-        var lines = data.Split("\n");
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var buttonA = lines[i++];
-            var buttonB = lines[i++];
-            var prize = lines[i++];
-            var machine = new Machine();
-
-            machine.A = ParseButton(buttonA.Trim());
-            machine.B = ParseButton(buttonB.Trim());
-            machine.Prize = ParsePrize(prize);
-            machines.Add(machine);
-        }
-        return machines;
-    }
-
-    private static DoublePoint ParsePrize(string prize)
-    {                                                                                                            //3345000000 
-        var x = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.IndexOf(',') - prize.IndexOf('=') - 1)) + 10000000000000;
-        prize = prize.Substring(prize.IndexOf(',') + 1, prize.Length - prize.IndexOf(',') - 1);
-        var y = long.Parse(prize.Substring(prize.IndexOf('=') + 1, prize.Length - prize.IndexOf('=') - 1)) + 10000000000000;
-        return new DoublePoint(x, y);
-    }
-
-    private static DoublePoint ParseButton(string button)
-    {
-        var x = int.Parse(button.Substring(button.IndexOf('+') + 1, button.IndexOf(',') - button.IndexOf('+') - 1));
-        button = button.Substring(button.IndexOf(',') + 1, button.Length - button.IndexOf(',') - 1);
-        var y = int.Parse(button.Substring(button.IndexOf('+') + 1, button.Length - button.IndexOf('+') - 1));
-        return new DoublePoint(x, y);
+        return robots;
     }
 }
 
