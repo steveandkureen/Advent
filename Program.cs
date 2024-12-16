@@ -26,17 +26,20 @@ using System.Xml.XPath;
 
 internal class Program
 {
-    public class Robot
-    {
-        public Vector2 Pos { get; set; }
-        public Vector2 Vel { get; set; }
-    }
+    const char UP = '^';
+    const char DOWN = 'v';
+    const char RIGHT = '>';
+    const char LEFT = '<';
+    const char ROBOT = '@';
+    const char WALL = '#';
+    const char BOX = 'O';
+    const char EMPTY = '.';
+    const char NEWBOX1 = '[';
+    const char NEWBOX2 = ']';
+    static List<char> Moves = new List<char>();
+    static List<List<char>> Map = new List<List<char>>();
 
-    const int Map_Width = 101;
-    const int Map_Height = 103;
-    const int Move_Seconds = 100000;
-
-    static List<string> Maps = new List<string>();
+    static bool SimpleBox = false;
 
     private static void Main(string[] args)
     {
@@ -46,147 +49,277 @@ internal class Program
         {
             data = reader.ReadToEnd();
         }
-        var robots = ParseRobots(data);
-        OutputMap(robots);
-        MoveRobots(robots);
-        Console.WriteLine("-------------Complete--------------");
-        OutputMap(robots);
-        CalculteAnswer(robots);
-    }
 
-    private static void CalculteAnswer(List<Robot> robots)
-    {
-        var quads = new int[4];
-        foreach (var robot in robots)
+        ParseMapData(data);
+        OutputMap();
+        var robot = FindRobot();
+        var moveCount = 0;
+        char lastmove = '-';
+        foreach (var move in Moves)
         {
-            if (robot.Pos.X < Map_Width / 2 && robot.Pos.Y < Map_Height / 2)
+            robot = MoveRobot(robot, move);
+            lastmove = move;
+            moveCount++;
+            if (moveCount == 19998)
             {
-                quads[0]++;
+                OutputMap();
             }
-            else if (robot.Pos.X > Map_Width / 2 && robot.Pos.Y < Map_Height / 2)
-            {
-                quads[1]++;
-            }
-            else if (robot.Pos.X < Map_Width / 2 && robot.Pos.Y > Map_Height / 2)
-            {
-                quads[2]++;
-            }
-            else if (robot.Pos.X > Map_Width / 2 && robot.Pos.Y > Map_Height / 2)
-            {
-                quads[3]++;
-            }
+            //Console.WriteLine("MoveCount: " + moveCount++);
+            //OutputMap();
+            //Thread.Sleep(100);
         }
-        Console.WriteLine($"Answer={quads[0] * quads[1] * quads[2] * quads[3]}");
-    }
-
-    private static void MoveRobots(List<Robot> robots)
-    {
-        for (var s = 0; s < Move_Seconds; s++)
+        Console.WriteLine("LastMove: " + lastmove);
+        OutputMap();
+        int boxCount = 0;
+        for (int y = 0; y < Map.Count; y++)
         {
-            for (int i = 0; i < robots.Count; i++)
+            var line = Map[y];
+            for (int x = 0; x < line.Count; x++)
             {
-                var robot = robots[i];
-                var newPos = new Vector2(robot.Pos.X + robot.Vel.X, robot.Pos.Y + robot.Vel.Y);
-                newPos.X = CheckBoundry(newPos.X, Map_Width);
-                newPos.Y = CheckBoundry(newPos.Y, Map_Height);
-                robot.Pos = newPos;
-            }
-            if (CheckForTree(robots.OrderBy(r => r.Pos.X).ThenBy(r => r.Pos.Y).ToList()))
-            {
-                OutputMap(robots);
-                Console.WriteLine($"---seconds:{s}----");
-                return;
-            }
-            if (s % 1000 == 0)
-            {
-                Console.WriteLine($"---seconds:{s}----");
-            }
-
-        }
-    }
-
-    private static bool CheckForTree(List<Robot> robots)
-    {
-        for (int i = 0; i < robots.Count; i++)
-        {
-            var robot = robots[i];
-            if (IsTree(robot, robots, 0))
-                return true;
-        }
-        return false;
-    }
-
-    private static bool IsTree(Robot robot, List<Robot> robots, int depth)
-    {
-        var r1 = robots.Where(r => r.Pos.X == robot.Pos.X - depth && r.Pos.Y == robot.Pos.Y + depth);
-        var r2 = robots.Where(r => r.Pos.X == robot.Pos.X + depth && r.Pos.Y == robot.Pos.Y + depth);
-        if (r1.Count() > 0 && r1.Count() > 0)
-        {
-            if (depth > 5)
-            {
-                return true;
-            }
-            else
-            {
-                return IsTree(robot, robots, depth + 1);
-            }
-        }
-        return false;
-    }
-
-    private static float CheckBoundry(float p, int max)
-    {
-        if (p >= max)
-        {
-            p -= max;
-        }
-        else if (p < 0)
-        {
-            p += max;
-        }
-        return p;
-    }
-
-    private static void OutputMap(List<Robot> robots)
-    {
-        var builder = new StringBuilder();
-        for (var y = 0; y < Map_Height; y++)
-        {
-            for (var x = 0; x < Map_Width; x++)
-            {
-                var r = robots.Where(r => r.Pos == new Vector2(x, y));
-                if (r.Count() == 0)
+                char pos = line[x];
+                if (pos == NEWBOX2)
                 {
-                    builder.Append(".");
-                    //Console.Write(".");
+                    boxCount++;
+                }
+            }
+        }
+        Console.WriteLine("Box Count: " + boxCount);
+        var answer = CalculateResult();
+        Console.WriteLine("Answer: " + answer);
+    }
+
+    private static object CalculateResult()
+    {
+        var result = 0;
+        var boxCount = 0;
+        for (int y = 0; y < Map.Count; y++)
+        {
+            var line = Map[y];
+            var width = Map[y].Count();
+            for (int x = 0; x < line.Count; x++)
+            {
+                char pos = line[x];
+                if (pos == BOX || pos == NEWBOX1)
+                {
+                    result += (100 * y) + x;
+                    boxCount++;
+                }
+            }
+        }
+        Console.WriteLine("BoxCount in Score: " + boxCount);
+        return result;
+    }
+
+    private static Point FindRobot()
+    {
+        for (int y = 0; y < Map.Count; y++)
+        {
+            var line = Map[y];
+            for (int x = 0; x < line.Count; x++)
+            {
+                char pos = line[x];
+                if (pos == ROBOT)
+                {
+                    return new Point(x, y);
+                }
+            }
+        }
+        return new Point();
+    }
+
+    private static Point MoveRobot(Point robot, char move)
+    {
+        var newPos = robot;
+        newPos = Move(move, newPos);
+        if (CheckMove(newPos, move, false))
+        {
+            CheckMove(newPos, move, true);
+            Map[newPos.Y][newPos.X] = '@';
+            Map[robot.Y][robot.X] = '.';
+            return newPos;
+        }
+        return robot;
+    }
+
+    private static Point Move(char move, Point currentPos)
+    {
+        var newPos = currentPos;
+        switch (move)
+        {
+            case UP:
+                newPos.Y -= 1;
+                break;
+            case DOWN:
+                newPos.Y += 1;
+                break;
+            case LEFT:
+                newPos.X -= 1;
+                break;
+            case RIGHT:
+                newPos.X += 1;
+                break;
+        }
+
+        return newPos;
+    }
+
+    private static bool CheckMove(Point newPos, char direction, bool doMove)
+    {
+        switch (Map[newPos.Y][newPos.X])
+        {
+            case WALL:
+                return false;
+            case EMPTY:
+                return true;
+            case BOX:
+            case NEWBOX1:
+            case NEWBOX2:
+                return PushBox(newPos, direction, doMove) ? true : false;
+        }
+        return false;
+    }
+
+    private static bool PushBox(Point newPos, char direction, bool doMove)
+    {
+        if (SimpleBox)
+            return PushBoxHorizontal(newPos, direction, doMove);
+
+        if (direction == UP || direction == DOWN)
+        {
+            return PushBoxVertical(newPos, direction, doMove);
+        }
+        return PushBoxHorizontal(newPos, direction, doMove);
+    }
+
+    private static bool PushBoxHorizontal(Point newPos, char direction, bool doMove)
+    {
+        var newBox = Move(direction, newPos);
+        if (CheckMove(newBox, direction, doMove))
+        {
+            if (doMove)
+            {
+                Map[newBox.Y][newBox.X] = Map[newPos.Y][newPos.X];
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static bool PushBoxVertical(Point newPos, char direction, bool doMove)
+    {
+        var newBox = Move(direction, newPos);
+        Point boxLeft, boxRight;
+        if (Map[newPos.Y][newPos.X] == ']')
+        {
+            boxRight = newBox;
+            boxLeft = new Point(newBox.X - 1, newBox.Y);
+        }
+        else
+        {
+            boxRight = new Point(newBox.X + 1, newBox.Y);
+            boxLeft = newBox;
+        }
+
+        if (CheckMove(boxRight, direction, doMove) && CheckMove(boxLeft, direction, doMove))
+        {
+            if (doMove)
+            {
+                if (Map[newPos.Y][newPos.X] == ']')
+                {
+                    Map[boxLeft.Y][boxLeft.X] = Map[newPos.Y][newPos.X - 1];
+                    Map[boxRight.Y][boxRight.X] = Map[newPos.Y][newPos.X];
+                    Map[newPos.Y][newPos.X - 1] = '.';
+                    Map[newPos.Y][newPos.X] = '.';
                 }
                 else
                 {
-                    builder.Append(r.Count());
-                    //Console.Write(r.Count());
+                    Map[boxLeft.Y][boxLeft.X] = Map[newPos.Y][newPos.X];
+                    Map[boxRight.Y][boxRight.X] = Map[newPos.Y][newPos.X + 1];
+                    Map[newPos.Y][newPos.X] = '.';
+                    Map[newPos.Y][newPos.X + 1] = '.';
                 }
             }
-            builder.Append("\n");
-            //Console.Write("\n");
+            return true;
         }
-        Console.Write(builder.ToString());
-        //Maps.Add(builder.ToString());
+        return false;
     }
 
-    private static List<Robot> ParseRobots(string data)
+    private static void OutputMap()
     {
-        var robots = new List<Robot>();
+        foreach (var line in Map)
+        {
+            foreach (var pos in line)
+            {
+                Console.Write(pos);
+            }
+            Console.Write("\n");
+        }
+    }
+
+    private static void ParseMapData(string data)
+    {
+        Console.WriteLine("Box Count: " + data.Where(c => c == 'O').Count());
+        bool readMap = true;
         foreach (var line in data.Split("\n"))
         {
-            var robot = new Robot();
-            var parts = line.Trim().Split(" ");
-            var pos = parts[0].Replace("p=", "").Split(",");
-            robot.Pos = new Vector2(float.Parse(pos[0]), float.Parse(pos[1]));
-            var vel = parts[1].Replace("v=", "").Split(",");
-            robot.Vel = new Vector2(float.Parse(vel[0]), float.Parse(vel[1]));
-            robots.Add(robot);
+            if (string.IsNullOrEmpty(line.Trim()))
+            {
+                readMap = false;
+                continue;
+            }
+
+            if (readMap)
+            {
+                var newLine = new List<char>();
+                foreach (var c in line.ToCharArray())
+                {
+                    if (SimpleBox)
+                    {
+                        newLine.AddRange([c]);
+                    }
+                    else
+                    {
+                        newLine.AddRange(TranslateChars(c));
+                    }
+
+                }
+                Map.Add(newLine);
+            }
+            else
+            {
+                Moves.AddRange(line.Trim().ToCharArray());
+            }
         }
-        return robots;
+        int boxCount = 0;
+        for (int y = 0; y < Map.Count; y++)
+        {
+            var line = Map[y];
+            for (int x = 0; x < line.Count; x++)
+            {
+                char pos = line[x];
+                if (pos == NEWBOX1)
+                {
+                    boxCount++;
+                }
+            }
+        }
+        Console.WriteLine("Box Count: " + boxCount);
+    }
+
+    private static List<char> TranslateChars(char c)
+    {
+        switch (c)
+        {
+            case WALL:
+                return ['#', '#'];
+            case BOX:
+                return ['[', ']'];
+            case EMPTY:
+                return ['.', '.'];
+            case ROBOT:
+                return ['@', '.'];
+        }
+        return ['.'];
     }
 }
 
